@@ -6,7 +6,7 @@ ci-test:
 	poetry run pytest -sv homework/tests
 
 test:
-	act -j build
+	act -j build --container-architecture linux/amd64
 
 format:
 	poetry run ruff format .

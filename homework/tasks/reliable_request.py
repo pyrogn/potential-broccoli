@@ -20,11 +20,15 @@ async def do_reliable_request(url: str, observer: ResultsObserver) -> None:
     """
 
     async with httpx.AsyncClient() as client:
-        # YOUR CODE GOES HERE
-        response = await client.get(url)
-        response.raise_for_status()
-        data = response.read()
-
-        observer.observe(data)
+        n_retry = 0
+        while n_retry <= 3:
+            try:
+                response = await client.get(url, timeout=15)
+                response.raise_for_status()
+                data = response.read()
+                observer.observe(data)
+                return
+            except (httpx.TimeoutException, httpx.HTTPStatusError, httpx.NetworkError):
+                n_retry += 1
+                continue
         return
-        #####################

@@ -37,6 +37,14 @@ class ItemStorage:
         """
         # In production environment we will use migration tool
         # like https://github.com/pressly/goose
+        await self._pool.execute(
+            """create table if not exists items (
+            item_id integer unique not null,
+            user_id integer not null,
+            title text not null,
+            description text not null
+            )"""
+        )
         # YOUR CODE GOES HERE
 
     async def save_items(self, items: list[ItemEntry]) -> None:
@@ -46,6 +54,15 @@ class ItemStorage:
         """
         # Don't use str-formatting, query args should be escaped to avoid
         # sql injections https://habr.com/ru/articles/148151/.
+        await self._pool.executemany(
+            """insert into items(item_id, user_id, title, description)
+            values
+            ($1, $2, $3, $4)""",
+            [
+                (item.item_id, item.user_id, item.title, item.description)
+                for item in items
+            ],
+        )
         # YOUR CODE GOES HERE
 
     async def find_similar_items(
@@ -54,4 +71,16 @@ class ItemStorage:
         """
         Напишите код для поиска записей, имеющих указанные user_id, title и description.
         """
+        records = await self._pool.fetch(
+            """select item_id, user_id, title, description
+            from items
+            where 1=1
+                and user_id = $1
+                and title = $2
+                and description = $3""",
+            user_id,
+            title,
+            description,
+        )
+        return [ItemEntry(**record) for record in records]
         # YOUR CODE GOES HERE
