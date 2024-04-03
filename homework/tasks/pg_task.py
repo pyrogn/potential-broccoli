@@ -38,14 +38,13 @@ class ItemStorage:
         # In production environment we will use migration tool
         # like https://github.com/pressly/goose
         await self._pool.execute(
-            """create table if not exists items (
-            item_id integer unique not null,
-            user_id integer not null,
-            title text not null,
-            description text not null
+            """CREATE TABLE IF NOT EXISTS items (
+            item_id INTEGER UNIQUE NOT NULL,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL
             )"""
         )
-        # YOUR CODE GOES HERE
 
     async def save_items(self, items: list[ItemEntry]) -> None:
         """
@@ -54,16 +53,39 @@ class ItemStorage:
         """
         # Don't use str-formatting, query args should be escaped to avoid
         # sql injections https://habr.com/ru/articles/148151/.
-        await self._pool.executemany(
-            """insert into items(item_id, user_id, title, description)
-            values
-            ($1, $2, $3, $4)""",
-            [
-                (item.item_id, item.user_id, item.title, item.description)
-                for item in items
-            ],
+        if not items:
+            return
+
+        # # version 1
+        # await self._pool.executemany(
+        #     """INSERT INTO items (item_id, user_id, title, description)
+        #     VALUES
+        #     ($1, $2, $3, $4)""",
+        #     [
+        #         (item.item_id, item.user_id, item.title, item.description)
+        #         for item in items
+        #     ],
+        # )
+
+        # version 2, all rows in one query
+        # and avoiding string formatting at all costs
+        values_insert_sql = ",".join(
+            f"(${4 * i + 1}, ${4 * i + 2}, ${4 * i + 3}, ${4 * i + 4})"
+            for i in range(len(items))
         )
-        # YOUR CODE GOES HERE
+
+        query = f"""
+        INSERT INTO items (item_id, user_id, title, description) 
+        VALUES {values_insert_sql}
+        """
+
+        params = [
+            value
+            for item in items
+            for value in (item.item_id, item.user_id, item.title, item.description)
+        ]
+
+        await self._pool.execute(query, *params)
 
     async def find_similar_items(
         self, user_id: int, title: str, description: str
@@ -72,15 +94,14 @@ class ItemStorage:
         Напишите код для поиска записей, имеющих указанные user_id, title и description.
         """
         records = await self._pool.fetch(
-            """select item_id, user_id, title, description
-            from items
-            where 1=1
-                and user_id = $1
-                and title = $2
-                and description = $3""",
+            """SELECT item_id, user_id, title, description
+            FROM items
+            WHERE 1=1
+                AND user_id = $1
+                AND title = $2
+                AND description = $3""",
             user_id,
             title,
             description,
         )
         return [ItemEntry(**record) for record in records]
-        # YOUR CODE GOES HERE
